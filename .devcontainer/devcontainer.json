@@ -1,0 +1,21 @@
+{
+    "name": "Antigravity Cloud Workstation",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "dbaeumer.vscode-eslint",
+                "googlecloudtools.cloudcode"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash"
+            }
+        }
+    },
+    "forwardPorts": [3000, 8080],
+    "postCreateCommand": "echo 'Environment Ready'"
+}

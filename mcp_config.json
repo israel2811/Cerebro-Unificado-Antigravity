@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "google-drive": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-google-drive"
+      ],
+      "env": {
+        "GOOGLE_DRIVE_FOLDER_ID": "REPLACE_WITH_FOLDER_ID"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/workspace/data"
+      ]
+    },
+    "anthropic": {
+       "command": "node",
+       "args": ["path/to/server-anthropic.js"],
+       "env": {
+         "ANTHROPIC_API_KEY": "REPLACE_WITH_KEY_PC1"
+       }
+    }
+  }
+}
