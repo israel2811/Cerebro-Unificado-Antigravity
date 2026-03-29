@@ -1,0 +1,5 @@
+
+# Antigravity Cloud Core - Connection info
+# IP: 34.136.48.253
+# User: antigravity
+# To connect: ssh -i ~/.ssh/google_compute_engine antigravity@34.136.48.253

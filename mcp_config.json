@@ -1,29 +1,57 @@
-{
-  "mcpServers": {
-    "google-drive": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-google-drive"
-      ],
-      "env": {
-        "GOOGLE_DRIVE_FOLDER_ID": "REPLACE_WITH_FOLDER_ID"
-      }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/workspace/data"
-      ]
-    },
-    "anthropic": {
-       "command": "node",
-       "args": ["path/to/server-anthropic.js"],
-       "env": {
-         "ANTHROPIC_API_KEY": "REPLACE_WITH_KEY_PC1"
-       }
-    }
-  }
+﻿{
+    "mcpServers":  {
+                       "google-drive":  {
+                                            "command":  "npx",
+                                            "args":  [
+                                                         "-y",
+                                                         "@modelcontextprotocol/server-google-drive"
+                                                     ],
+                                            "env":  {
+                                                        "GOOGLE_DRIVE_FOLDER_ID":  "REPLACE_WITH_FOLDER_ID"
+                                                    }
+                                        },
+                       "filesystem":  {
+                                          "command":  "npx",
+                                          "args":  [
+                                                       "-y",
+                                                       "@modelcontextprotocol/server-filesystem",
+                                                       "C:\\Users\\Lenovo\\Antigravity_Cloud_Project\\data"
+                                                   ]
+                                      },
+                       "hivemind":  {
+                                        "command":  "C:\\Users\\Lenovo\\AppData\\Local\\Python\\bin\\python.exe",
+                                        "args":  [
+                                                     "C:\\Users\\Lenovo\\.gemini\\antigravity\\ops\\hivemind_mcp_server.py"
+                                                 ],
+                                        "env":  {
+                                                    "HIVEMIND_CDP_HOST":  "127.0.0.1",
+                                                    "HIVEMIND_CDP_PORT":  "9222",
+                                                    "HIVEMIND_PYTHON":  "C:\\Users\\Lenovo\\AppData\\Local\\Python\\bin\\python.exe",
+                                                    "HIVEMIND_ORCHESTRATOR_PATH":  "C:\\Users\\Lenovo\\orchestrator.py"
+                                                }
+                                    },
+                       "anthropic":  {
+                                         "command":  "node",
+                                         "args":  [
+                                                      "path/to/server-anthropic.js"
+                                                  ],
+                                         "env":  {
+                                                     "ANTHROPIC_API_KEY":  "REPLACE_WITH_KEY_PC1"
+                                                 }
+                                     },
+                       "memory":  {
+                                      "command":  "npx",
+                                      "args":  [
+                                                   "-y",
+                                                   "@modelcontextprotocol/server-memory"
+                                               ]
+                                  },
+                       "everything":  {
+                                          "command":  "npx",
+                                          "args":  [
+                                                       "-y",
+                                                       "@modelcontextprotocol/server-everything"
+                                                   ]
+                                      }
+                   }
 }
