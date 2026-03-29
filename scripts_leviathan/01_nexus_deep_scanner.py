@@ -1,10 +1,14 @@
 import os
 import json
 import gc
+import platform
+
+# Detección de VM en Nube (Codespaces/Gitpod)
+IS_CLOUD_VM = platform.system().lower() == "linux"
 
 # CONFIGURACIÓN LEVIATÁN
 SEARCH_DIRS = [
-    r"C:\Users\Lenovo\.gemini\antigravity\brain",
+    "/workspaces/Antigravity_Cloud_Project/data_lake" if IS_CLOUD_VM else r"C:\Users\Lenovo\.gemini\antigravity\brain",
     r"C:\Users\Lenovo\.codex",
     r"C:\Users\Lenovo\Antigravity_Cloud_Project"
 ]
@@ -52,8 +56,9 @@ def scan_and_extract():
                                     outfile.write(chunk)
                                     total_bytes_extracted += len(chunk.encode('utf-8'))
                                     
-                            # Liberación de memoria tras cada archivo procesado
-                            gc.collect()
+                            # Liberación de memoria tras cada archivo procesado (Sólo en local Windows - 2GB RAM)
+                            if not IS_CLOUD_VM:
+                                gc.collect()
                             
                         except Exception as e:
                             print(f"[!] Error extrayendo {filepath}: {e}")

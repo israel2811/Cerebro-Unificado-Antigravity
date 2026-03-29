@@ -2,15 +2,19 @@ import os
 import json
 import gc
 import re
+import platform
 from bs4 import BeautifulSoup
+
+# Detección de VM en Nube (Codespaces/Gitpod)
+IS_CLOUD_VM = platform.system().lower() == "linux"
 
 # NOTA: En un entorno real, descomentar y usar google-api-python-client
 # from google.oauth2.credentials import Credentials
 # from googleapiclient.discovery import build
 
-INPUT_FILE = r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\raw_corpus_extraction.txt"
-OUTPUT_DIR = r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\clean_chunks"
-MAX_WORDS_PER_CHUNK = 30000
+INPUT_FILE = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/raw_corpus_extraction.txt" if IS_CLOUD_VM else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\raw_corpus_extraction.txt"
+OUTPUT_DIR = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/clean_chunks" if IS_CLOUD_VM else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\clean_chunks"
+MAX_WORDS_PER_CHUNK = 100000 if IS_CLOUD_VM else 30000
 
 def clean_html_noise(raw_text):
     """Filtra y purifica el texto, quitando HTML, JSON y ruido sintáctico."""
@@ -72,7 +76,8 @@ def upload_to_google_docs(chunks):
         # document = docs_service.documents().create(body={'title': doc_title}).execute()
         # docs_service.documents().batchUpdate(documentId=document.get('documentId'), body={'requests': [{'insertText': {'location': {'index': 1}, 'text': chunk}}]}).execute()
         
-        gc.collect() # Prevenir OOM en iteraciones grandes
+        if not IS_CLOUD_VM:
+            gc.collect() # Prevenir OOM en iteraciones grandes sólo en Windows Local
 
 if __name__ == "__main__":
     print("[*] Iniciando PROTOCOLO 2: DOCTOR INJECTOR")
@@ -88,11 +93,13 @@ if __name__ == "__main__":
         
     cleaned = clean_html_noise(raw_data)
     del raw_data # Liberar memoria volátil masiva
-    gc.collect()
+    if not IS_CLOUD_VM:
+        gc.collect()
     
     volumenes = semantic_chunking(cleaned)
     del cleaned
-    gc.collect()
+    if not IS_CLOUD_VM:
+        gc.collect()
     
     upload_to_google_docs(volumenes)
     print("[+] Protocolo 2 Finalizado. Data Lake preparado.")

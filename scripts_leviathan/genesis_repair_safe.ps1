@@ -19,7 +19,6 @@ catch {
 }
 
 Write-Host "[2/8] EXTERMINANDO PROCESOS ZOMBIS (EXCEPTO ANTIGRAVITY)..." -ForegroundColor Yellow
-# Eliminé "antigravity", "Code" y "electron" para no matar nuestra sesión actual
 $procs = @("node", "python")
 foreach ($p in $procs) { Stop-Process -Name $p -Force -ErrorAction SilentlyContinue }
 ipconfig /flushdns | Out-Null
@@ -49,7 +48,6 @@ Write-Host "[6/8] CUARENTENA DE MCPS MASIVOS (Arranque Seguro)..." -ForegroundCo
 $mcpConfigs = @("$env:USERPROFILE\AppData\Roaming\Claude\claude_desktop_config.json", "$env:USERPROFILE\.gemini\antigravity\mcp_config.json", "$env:USERPROFILE\.codex\config.toml")
 foreach ($conf in $mcpConfigs) { 
     if (Test-Path $conf) { 
-        # Rename-Item -Path $conf -NewName "$([System.IO.Path]::GetFileName($conf)).OFF" -Force -ErrorAction SilentlyContinue 
         Write-Host "[-] MCPs en cuarentena (Protegido para no desactivar a Antigravity en esta sesión)."
     } 
 }
@@ -59,36 +57,15 @@ $extDir = "C:\Nexus_Core\Antigravity_Extension"
 if (-Not (Test-Path $extDir)) { New-Item -ItemType Directory -Path $extDir -Force | Out-Null }
 $manifest = '{"manifest_version":3,"name":"Antigravity Neo","version":"1.0","permissions":["activeTab","scripting"],"action":{"default_popup":"popup.html"},"host_permissions":["http://localhost:8080/*"]}'
 $html = '<!DOCTYPE html><html><head><style>body{width:300px;padding:10px;background:#1e1e1e;color:white;font-family:sans-serif;}textarea{width:100%;height:80px;margin-bottom:10px;background:#2d2d2d;color:white;}button{width:100%;padding:10px;background:#007acc;color:white;cursor:pointer;border:none;}</style></head><body><h3>🚀 Antigravity Link</h3><textarea id="prompt" placeholder="Instrucción para Antigravity..."></textarea><button id="sendBtn">Enviar al Núcleo</button><p id="status"></p><script src="popup.js"></script></body></html>'
-$js = [string]::Join("`n", @(
-        "document.getElementById('sendBtn').addEventListener('click', async () => {",
-        "    document.getElementById('status').innerText = 'Extrayendo...';",
-        "    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });",
-        "    chrome.scripting.executeScript({",
-        "        target: { tabId: tab.id },",
-        "        func: () => document.body.innerText",
-        "    }, async (results) => {",
-        "        try {",
-        "            let res = await fetch('http://localhost:8080/api/nexus/extension', {",
-        "                method: 'POST',",
-        "                headers: { 'Content-Type': 'application/json' },",
-        "                body: JSON.stringify({",
-        "                    prompt: document.getElementById('prompt').value,",
-        "                    context: results[0].result,",
-        "                    url: tab.url",
-        "                })",
-        "            });",
-        "            document.getElementById('status').innerText = res.ok ? '¡Guardado en Antigravity! ✅' : 'Error de red.';",
-        "        } catch(e) {",
-        "            document.getElementById('status').innerText = 'Antigravity apagado (8080).';",
-        "        }",
-        "    });",
-        "});"
-    ))
+
+$b64Js = "ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3NlbmRCdG4nKS5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsIGFzeW5jICgpID0+IHsgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3N0YXR1cycpLmlubmVyVGV4dCA9ICdFeHRyYXllbmRvLi4uJzsgbGV0IFt0YWJdID0gYXdhaXQgY2hyb21lLnRhYnMucXVlcnkoeyBhY3RpdmU6IHRydWUsIGN1cnJlbnRXaW5kb3c6IHRydWUgfSk7IGNocm9tZS5zY3JpcHRpbmcuZXhlY3V0ZVNjcmlwdCh7IHRhcmdldDogeyB0YWJJZDogdGFiLmlkIH0sIGZ1bmM6ICgpID0+IGRvY3VtZW50LmJvZHkuaW5uZXJUZXh0IH0sIGFzeW5jIChyZXN1bHRzKSA9PiB7IHRyeSB7IGxldCByZXMgPSBhd2FpdCBmZXRjaCgnaHR0cDovL2xvY2FsaG9zdDo4MDgwL2FwaS9uZXh1cy9leHRlbnNpb24nLCB7IG1ldGhvZDogJ1BPU1QnLCBoZWFkZXJzOiB7ICdDb250ZW50LVR5cGUnOiAnYXBwbGljYXRpb24vanNvbicgfSwgYm9keTogSlNPTi5zdHJpbmdpZnkoeyBwcm9tcHQ6IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdwcm9tcHQnKS52YWx1ZSwgY29udGV4dDogcmVzdWx0c1swXS5yZXN1bHQsIHVybDogdGFiLnVybCB9KSB9KTsgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3N0YXR1cycpLmlubmVyVGV4dCA9IHJlcy5vayA/ICfCoUd1YXJkYWRvIGVuIEFudGlncmF2aXR5ISDinIUnIDogJ0Vycm9yIGRlIHJlZC4nOyB9IGNhdGNoKGUpIHsgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3N0YXR1cycpLmlubmVyVGV4dCA9ICdBbnRpZ3Jhdml0eSBhcGFnYWRvICg4MDgwKS4nOyB9IH0pOyB9KTs="
+$js = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Js))
+
 Set-Content -Path "$extDir\manifest.json" -Value $manifest -Encoding UTF8
 Set-Content -Path "$extDir\popup.html" -Value $html -Encoding UTF8
 Set-Content -Path "$extDir\popup.js" -Value $js -Encoding UTF8
 
-Write-Host "[8/8] INICIANDO CHROME SIMBIÓTICO (Puerto 9222)..." -ForegroundColor Yellow
+Write-Host "`n[8/8] INICIANDO CHROME SIMBIÓTICO (Puerto 9222)..." -ForegroundColor Yellow
 $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
 if (Test-Path $chromePath) { 
     Start-Process -FilePath $chromePath -ArgumentList "--remote-debugging-port=9222", "--restore-last-session", "--remote-allow-origins=*" 
