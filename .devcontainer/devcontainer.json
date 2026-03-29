@@ -1,21 +1,44 @@
 {
-    "name": "Antigravity Cloud Workstation",
-    "build": {
-        "dockerfile": "Dockerfile",
-        "context": ".."
+    "name": "Omni-Swarm Leviathan DevContainer",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11-bullseye",
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "lts"
+        },
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
     },
     "customizations": {
         "vscode": {
+            "settings": {
+                "python.formatting.provider": "black",
+                "editor.formatOnSave": true
+            },
             "extensions": [
                 "ms-python.python",
-                "dbaeumer.vscode-eslint",
-                "googlecloudtools.cloudcode"
-            ],
-            "settings": {
-                "terminal.integrated.defaultProfile.linux": "bash"
-            }
+                "ms-azuretools.vscode-docker",
+                "GitHub.copilot"
+            ]
         }
     },
-    "forwardPorts": [3000, 8080],
-    "postCreateCommand": "echo 'Environment Ready'"
+    "postCreateCommand": "pip install -r requirements_cloud.txt && npm install -g cloudflared playwright && playwright install chromium",
+    "hostRequirements": {
+        "cpus": 4,
+        "memory": "8gb"
+    },
+    "remoteUser": "vscode",
+    "forwardPorts": [
+        8080,
+        9222
+    ],
+    "portsAttributes": {
+        "9222": {
+            "label": "Playwright CDP Port",
+            "onAutoForward": "ignore"
+        },
+        "8080": {
+            "label": "Neo Extension API",
+            "onAutoForward": "notify"
+        }
+    }
 }
