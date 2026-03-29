@@ -59,7 +59,31 @@ $extDir = "C:\Nexus_Core\Antigravity_Extension"
 if (-Not (Test-Path $extDir)) { New-Item -ItemType Directory -Path $extDir -Force | Out-Null }
 $manifest = '{"manifest_version":3,"name":"Antigravity Neo","version":"1.0","permissions":["activeTab","scripting"],"action":{"default_popup":"popup.html"},"host_permissions":["http://localhost:8080/*"]}'
 $html = '<!DOCTYPE html><html><head><style>body{width:300px;padding:10px;background:#1e1e1e;color:white;font-family:sans-serif;}textarea{width:100%;height:80px;margin-bottom:10px;background:#2d2d2d;color:white;}button{width:100%;padding:10px;background:#007acc;color:white;cursor:pointer;border:none;}</style></head><body><h3>🚀 Antigravity Link</h3><textarea id="prompt" placeholder="Instrucción para Antigravity..."></textarea><button id="sendBtn">Enviar al Núcleo</button><p id="status"></p><script src="popup.js"></script></body></html>'
-$js = "document.getElementById('sendBtn').addEventListener('click', async () => { document.getElementById('status').innerText = 'Extrayendo...'; let [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); chrome.scripting.executeScript({ target: { tabId: tab.id }, function: () => document.body.innerText }, async (results) => { try { let res = await fetch('http://localhost:8080/api/nexus/extension', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: document.getElementById('prompt').value, context: results[0].result, url: tab.url }) }); document.getElementById('status').innerText = res.ok ? '¡Guardado en Antigravity! ✅' : 'Error de red.'; } catch(e) { document.getElementById('status').innerText = 'Antigravity apagado (8080).'; } }); });"
+$js = @"
+document.getElementById('sendBtn').addEventListener('click', async () => { 
+    document.getElementById('status').innerText = 'Extrayendo...'; 
+    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); 
+    chrome.scripting.executeScript({ 
+        target: { tabId: tab.id }, 
+        func: () => document.body.innerText 
+    }, async (results) => { 
+        try { 
+            let res = await fetch('http://localhost:8080/api/nexus/extension', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ 
+                    prompt: document.getElementById('prompt').value, 
+                    context: results[0].result, 
+                    url: tab.url 
+                }) 
+            }); 
+            document.getElementById('status').innerText = res.ok ? '¡Guardado en Antigravity! ✅' : 'Error de red.'; 
+        } catch(e) { 
+            document.getElementById('status').innerText = 'Antigravity apagado (8080).'; 
+        } 
+    }); 
+});
+"@
 Set-Content -Path "$extDir\manifest.json" -Value $manifest -Encoding UTF8
 Set-Content -Path "$extDir\popup.html" -Value $html -Encoding UTF8
 Set-Content -Path "$extDir\popup.js" -Value $js -Encoding UTF8
