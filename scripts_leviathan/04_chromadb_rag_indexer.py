@@ -73,17 +73,21 @@ def local_chroma_rag_inject():
             batch_metadatas.append({"source": archivo, "type": "nexus_chunk"})
             batch_ids.append(doc_id)
 
-            if len(batch_docs) >= BATCH_SIZE:
+        except Exception as e:
+            print(f"  [X] Error leyendo {archivo}: {e}")
+
+        if len(batch_docs) >= BATCH_SIZE:
+            try:
                 print(f"  -> [{i}/{len(archivos)}] Inyectando lote de {len(batch_docs)} documentos...")
                 collection.add(
                     documents=batch_docs,
                     metadatas=batch_metadatas,
                     ids=batch_ids
                 )
+            except Exception as e:
+                print(f"  [X] Error vectorizando lote cerca de {archivo}: {e}")
+            finally:
                 batch_docs, batch_metadatas, batch_ids = [], [], []
-
-        except Exception as e:
-            print(f"  [X] Error procesando {archivo}: {e}")
 
     # Flush final
     if batch_docs:
@@ -96,6 +100,8 @@ def local_chroma_rag_inject():
             )
         except Exception as e:
             print(f"  [X] Error en flush final: {e}")
+        finally:
+            batch_docs, batch_metadatas, batch_ids = [], [], []
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
