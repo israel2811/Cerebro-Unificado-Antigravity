@@ -55,6 +55,7 @@ def local_chroma_rag_inject():
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
+        # OPERACIÓN DE ARCHIVO INDIVIDUAL
         try:
             with open(ruta, "r", encoding="utf-8") as f:
                 contenido = f.read()
@@ -73,18 +74,24 @@ def local_chroma_rag_inject():
             batch_metadatas.append({"source": archivo, "type": "nexus_chunk"})
             batch_ids.append(doc_id)
 
-            # INYECCIÓN POR LOTES: Reduce overhead de red/IPC y optimiza vectorización
-            if len(batch_docs) >= BATCH_SIZE:
+        except Exception as e:
+            print(f"  [X] Error procesando archivo {archivo}: {e}")
+            continue
+
+        # INYECCIÓN POR LOTES: Reduce overhead de red/IPC y optimiza vectorización
+        if len(batch_docs) >= BATCH_SIZE:
+            try:
                 print(f"  -> [{i}/{len(archivos)}] Inyectando lote de {len(batch_docs)}...")
                 collection.add(
                     documents=batch_docs,
                     metadatas=batch_metadatas,
                     ids=batch_ids
                 )
+            except Exception as e:
+                print(f"  [X] Error inyectando lote: {e}")
+            finally:
+                # Siempre resetear el lote para no arrastrar errores
                 batch_docs, batch_metadatas, batch_ids = [], [], []
-
-        except Exception as e:
-            print(f"  [X] Error procesando {archivo}: {e}")
 
     # Flush final para el último lote incompleto
     if batch_docs:
