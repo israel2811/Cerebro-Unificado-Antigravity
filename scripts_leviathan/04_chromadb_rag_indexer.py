@@ -80,7 +80,9 @@ def local_chroma_rag_inject():
                     ids=batch_ids
                 )
             except Exception as e:
-                print(f"  [X] Error vectorizando lote en {archivo}: {e}")
+                # Mejoramos reporte de errores para identificar el rango del lote fallido
+                first_file = batch_metadatas[0]["source"]
+                print(f"  [X] Error vectorizando lote (desde {first_file} hasta {archivo}): {e}")
             finally:
                 batch_docs, batch_metadatas, batch_ids = [], [], []
 
