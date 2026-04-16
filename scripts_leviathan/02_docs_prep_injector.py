@@ -8,6 +8,10 @@ from bs4 import BeautifulSoup
 # Detección de VM en Nube (Codespaces/Gitpod)
 IS_CLOUD_VM = platform.system().lower() == "linux"
 
+# NOTA: En un entorno real, descomentar y usar google-api-python-client
+# from google.oauth2.credentials import Credentials
+# from googleapiclient.discovery import build
+
 INPUT_FILE = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/raw_corpus_extraction.txt" if IS_CLOUD_VM else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\raw_corpus_extraction.txt"
 OUTPUT_DIR = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/clean_chunks" if IS_CLOUD_VM else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\clean_chunks"
 MAX_WORDS_PER_CHUNK = 100000 if IS_CLOUD_VM else 30000
@@ -43,6 +47,11 @@ def save_chunk(chunk_words, index):
     doc_title = f"CORPUS_TESIS_VOL_{index}"
     file_path = os.path.join(OUTPUT_DIR, f"{doc_title}.txt")
     
+    # Simulación de la conexión a API (Armadura lista para inyectar token oauth)
+    # creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    # docs_service = build('docs', 'v1', credentials=creds)
+    # drive_service = build('drive', 'v3', credentials=creds)
+
     chunk_text = " ".join(chunk_words)
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(chunk_text)
