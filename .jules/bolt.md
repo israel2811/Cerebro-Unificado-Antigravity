@@ -1,0 +1,3 @@
+## 2025-04-17 - ChromaDB Batching and String Heuristics
+**Learning:** For vector database indexing (ChromaDB), switching from individual `collection.add()` calls to batched calls (BATCH_SIZE=50) significantly reduces IPC/network overhead. Additionally, using a character-length heuristic (e.g., `len(text) < 150000`) before performing expensive `.split()` operations for word-count limits provides a measurable speedup for smaller chunks while remaining safe for large ones.
+**Action:** Always implement batching for vector DB ingestion and use fast pre-filters (like string length) before CPU-intensive text processing.
