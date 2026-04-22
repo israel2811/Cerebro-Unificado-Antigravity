@@ -19,6 +19,7 @@ except ImportError:
 
 CLEAN_CHUNKS_DIR = r"/workspaces/Antigravity_Cloud_Project/scripts_leviathan/clean_chunks" if os.name == 'posix' else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\clean_chunks"
 DB_PATH = r"/workspaces/Antigravity_Cloud_Project/nexus_vector_db" if os.name == 'posix' else r"C:\Users\Lenovo\Antigravity_Cloud_Project\nexus_vector_db"
+BATCH_SIZE = 50 # Optimización: Reducir latencia de IPC y red mediante procesamiento por lotes
 
 def local_chroma_rag_inject():
     print("🚀 [CHROMADB RAG] Base Vectorial 100% Autónoma y Gratuita Iniciada...")
@@ -42,30 +43,52 @@ def local_chroma_rag_inject():
         print("[!] No hay chunks de texto para procesar.")
         return
 
-    print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
+    print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales (Batch Size: {BATCH_SIZE})...")
     
+    batch_docs = []
+    batch_metas = []
+    batch_ids = []
+
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
-        with open(ruta, "r", encoding="utf-8") as f:
-            contenido = f.read()
-            
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
-            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
-
-        doc_id = f"chunk_{i}_{archivo}"
-        
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
-            collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
-            )
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read()
+
+            # Heurística Bolt: Solo realizar split() costoso si el string es lo suficientemente largo
+            # Un string de < 200,000 chars raramente supera las 40,000 palabras (promedio 5 chars/word).
+            if len(contenido) > 200000:
+                words = contenido.split()
+                if len(words) > 40000:
+                    print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
+                    contenido = " ".join(words[:40000])
+
+            doc_id = f"chunk_{i}_{archivo}"
+            batch_docs.append(contenido)
+            batch_metas.append({"source": archivo, "type": "nexus_chunk"})
+            batch_ids.append(doc_id)
+
+            if len(batch_docs) >= BATCH_SIZE:
+                try:
+                    print(f"  -> Inyectando lote de {len(batch_docs)} documentos...")
+                    collection.add(documents=batch_docs, metadatas=batch_metas, ids=batch_ids)
+                except Exception as e:
+                    print(f"  [X] Error inyectando lote (archivos {i-len(batch_docs)+1} a {i}): {e}")
+                finally:
+                    # Siempre resetear el lote para evitar envenenamiento de lotes subsiguientes
+                    batch_docs, batch_metas, batch_ids = [], [], []
+
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error procesando archivo {archivo}: {e}")
+
+    # Flush final para el último lote
+    if batch_docs:
+        try:
+            print(f"  -> Finalizando inyección: lote de {len(batch_docs)} documentos...")
+            collection.add(documents=batch_docs, metadatas=batch_metas, ids=batch_ids)
+        except Exception as e:
+            print(f"  [X] Error en lote final: {e}")
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
