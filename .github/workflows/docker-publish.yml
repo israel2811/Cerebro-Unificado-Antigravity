@@ -20,8 +20,6 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
-  # ⚡ Bolt: Addressing Node.js 20 deprecation
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 
 jobs:
