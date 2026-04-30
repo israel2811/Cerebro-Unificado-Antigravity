@@ -7,3 +7,7 @@
 ## 2026-04-30 - CI Build Failure: Missing Dockerfile
 **Learning:** The GitHub Action workflow `.github/workflows/docker-publish.yml` defaults to looking for a `Dockerfile` in the repository root. This repository keeps its Dockerfile in `.devcontainer/Dockerfile`, causing CI build failures.
 **Action:** When configuring Docker build actions in this repository, always explicitly set `file: .devcontainer/Dockerfile`. Avoid using specific commit SHAs for actions when stable versions (e.g., @v4) are available to simplify maintenance and resolve version resolution errors.
+
+## 2026-04-30 - CI Build Failure: GPG Key De-armoring
+**Learning:** Installing Google Cloud CLI via apt in a Dockerfile (Debian/Ubuntu) requires the GPG key to be de-armored if using the `signed-by` option in `sources.list`. Using a raw GPG key file results in `NO_PUBKEY` errors during `apt-get update`.
+**Action:** Always use `curl ... | gpg --dearmor | tee /usr/share/keyrings/cloud.google.gpg` when adding the Google Cloud GPG key to ensure `apt` can correctly verify the repository signature.
