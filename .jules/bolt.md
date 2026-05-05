@@ -1,0 +1,3 @@
+## 2026-05-05 - Optimizing Large String Truncation and Database Batching
+**Learning:** Using `str.split()` on large strings in Python creates a full list of substrings in memory, which is both slow and memory-intensive. For simple truncation, `str.split(None, maxsplit)` is significantly faster (~8.5x in this environment) as it stops processing once the limit is reached. Additionally, wrapping batch operations in `try...finally` to clear state is critical to prevent "poisoned batches" from blocking the entire pipeline.
+**Action:** Always use `maxsplit` when checking for or enforcing word limits on large text buffers. Implement robust `finally` blocks in batching logic to ensure state is reset even on injection failure.

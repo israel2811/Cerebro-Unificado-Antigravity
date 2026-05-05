@@ -44,28 +44,55 @@ def local_chroma_rag_inject():
 
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
     
+    # OPTIMIZACIÓN BOLT: Procesamiento por lotes (batching) y pre-filtrado de strings
+    BATCH_SIZE = 50
+    batch_docs = []
+    batch_metadatas = []
+    batch_ids = []
+
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
-        with open(ruta, "r", encoding="utf-8") as f:
-            contenido = f.read()
-            
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
-            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
-
-        doc_id = f"chunk_{i}_{archivo}"
-        
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
-            collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
-            )
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read()
+            
+            # OPTIMIZACIÓN BOLT: Heurística de longitud para evitar split() costoso.
+            # 40,000 palabras suelen ser al menos 40,000 caracteres.
+            if len(contenido) > 40000:
+                # Usar maxsplit para evitar procesar todo el buffer si es muy grande.
+                words_check = contenido.split(None, 40001)
+                if len(words_check) > 40000:
+                    print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
+                    contenido = " ".join(words_check[:40000])
+
+            doc_id = f"chunk_{i}_{archivo}"
+
+            batch_docs.append(contenido)
+            batch_metadatas.append({"source": archivo, "type": "nexus_chunk"})
+            batch_ids.append(doc_id)
+
+            # Si alcanzamos el tamaño del lote, inyectamos a Chroma
+            if len(batch_docs) >= BATCH_SIZE:
+                try:
+                    print(f"  -> [{i}/{len(archivos)}] Inyectando lote de {len(batch_docs)} documentos...")
+                    collection.add(documents=batch_docs, metadatas=batch_metadatas, ids=batch_ids)
+                except Exception as e:
+                    print(f"  [X] Error inyectando lote en archivo {archivo}: {e}")
+                finally:
+                    # Siempre limpiar el lote para evitar re-intentar fallos infinitamente
+                    batch_docs, batch_metadatas, batch_ids = [], [], []
+
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error procesando {archivo}: {e}")
+
+    # Inyectar remanentes del último lote
+    if batch_docs:
+        try:
+            print(f"  -> Finalizando inyección: {len(batch_docs)} documentos restantes...")
+            collection.add(documents=batch_docs, metadatas=batch_metadatas, ids=batch_ids)
+        except Exception as e:
+            print(f"  [X] Error en lote final: {e}")
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
