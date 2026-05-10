@@ -43,29 +43,59 @@ def local_chroma_rag_inject():
         return
 
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
-    
-    for i, archivo in enumerate(archivos, 1):
-        ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
-        
-        with open(ruta, "r", encoding="utf-8") as f:
-            contenido = f.read()
-            
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
-            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
 
-        doc_id = f"chunk_{i}_{archivo}"
-        
+    # OPTIMIZACIÓN BOLT: Procesamiento por lotes para reducir IPC y overhead de DB
+    BATCH_SIZE = 50
+    batch_docs = []
+    batch_metadatas = []
+    batch_ids = []
+
+    def flush_batch():
+        """Inyecta el lote actual en ChromaDB y limpia los acumuladores."""
+        if not batch_docs:
+            return
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
+            print(f"  [*] Inyectando lote de {len(batch_docs)} documentos a ChromaDB...")
             collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
+                documents=batch_docs,
+                metadatas=batch_metadatas,
+                ids=batch_ids
             )
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error crítico en inyección de lote: {e}")
+        finally:
+            batch_docs.clear()
+            batch_metadatas.clear()
+            batch_ids.clear()
+
+    for i, archivo in enumerate(archivos, 1):
+        ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
+
+        try:
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read()
+
+            # OPTIMIZACIÓN BOLT: Heurística de longitud de caracteres antes de split()
+            # Reduce el uso de CPU al evitar split() en archivos pequeños.
+            # 40k palabras siempre ocuparán > 40k caracteres.
+            if len(contenido) > 40000:
+                # OPTIMIZACIÓN BOLT: split(None, maxsplit) es O(maxsplit) no O(N)
+                words = contenido.split(None, 40001)
+                if len(words) > 40000:
+                    print(f"  [!] Advertencia: {archivo} es enorme. Truncando a 40k palabras.")
+                    contenido = " ".join(words[:40000])
+
+            batch_docs.append(contenido)
+            batch_metadatas.append({"source": archivo, "type": "nexus_chunk"})
+            batch_ids.append(f"chunk_{i}_{archivo}")
+
+            if len(batch_docs) >= BATCH_SIZE:
+                flush_batch()
+        except Exception as e:
+            print(f"  [X] Error procesando {archivo}: {e}")
+
+    # Flush final para asegurar que no queden remanentes
+    flush_batch()
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
