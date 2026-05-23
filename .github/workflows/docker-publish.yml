@@ -20,8 +20,6 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
-  # Opt into Node.js 24 for all actions
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 
 jobs:
