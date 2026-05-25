@@ -54,9 +54,9 @@ def local_chroma_rag_inject():
             return
         try:
             collection.add(
-                documents=batch_docs,
-                metadatas=batch_metadatas,
-                ids=batch_ids
+                documents=list(batch_docs),
+                metadatas=list(batch_metadatas),
+                ids=list(batch_ids)
             )
         except Exception as e:
             print(f"  [X] Error vectorizando lote: {e}")
