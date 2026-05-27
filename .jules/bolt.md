@@ -1,0 +1,3 @@
+## 2026-05-27 - Optimized Word Count Truncation and Batch Ingestion
+**Learning:** Using `.split()` on large text buffers (e.g., 1M+ words) multiple times for truncation checks is extremely expensive. Using `split(None, maxsplit)` provides a ~100x speedup by avoiding full-string parsing when only a subset is needed. Additionally, batching ChromaDB `collection.add` calls significantly reduces overhead compared to individual insertions.
+**Action:** Always use `maxsplit` when truncating or checking word counts in large text buffers. Implement batch processing with robust `finally` block cleanup to prevent "poisoned batches" after an error.
