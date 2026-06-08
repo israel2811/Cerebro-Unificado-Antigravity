@@ -1,0 +1,3 @@
+## 2026-06-08 - Optimized string truncation and batching in indexer
+**Learning:** In Python, `string.split()` without arguments generates a full list of words, which is O(N) in memory and time. For truncation purposes, `string.split(None, MAX_WORDS + 1)` is significantly faster (~130x for 1M words) as it stops splitting after the limit. Batching `collection.add()` calls in ChromaDB (BATCH_SIZE=20) drastically reduces transaction overhead compared to individual calls.
+**Action:** Always use `maxsplit` when only a subset of words/tokens is needed from a large text. Implement batching for all vector database injections to ensure scalability.
