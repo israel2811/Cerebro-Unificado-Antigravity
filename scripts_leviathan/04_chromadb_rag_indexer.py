@@ -42,8 +42,30 @@ def local_chroma_rag_inject():
         print("[!] No hay chunks de texto para procesar.")
         return
 
-    print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
-    
+    print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales (Batching activo)...")
+
+    batch_docs = []
+    batch_metadatas = []
+    batch_ids = []
+    BATCH_SIZE = 20 # Reducción de ~20x en llamadas a la API/DB mediante batching
+
+    def flush_batch():
+        if not batch_docs:
+            return
+        try:
+            print(f"  -> Inyectando lote de {len(batch_docs)} documentos...")
+            collection.add(
+                documents=batch_docs,
+                metadatas=batch_metadatas,
+                ids=batch_ids
+            )
+        except Exception as e:
+            print(f"  [X] Error vectorizando lote: {e}")
+        finally:
+            batch_docs.clear()
+            batch_metadatas.clear()
+            batch_ids.clear()
+
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
@@ -57,15 +79,15 @@ def local_chroma_rag_inject():
 
         doc_id = f"chunk_{i}_{archivo}"
         
-        try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
-            collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
-            )
-        except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+        batch_docs.append(contenido)
+        batch_metadatas.append({"source": archivo, "type": "nexus_chunk"})
+        batch_ids.append(doc_id)
+
+        if len(batch_docs) >= BATCH_SIZE:
+            flush_batch()
+
+    # Flush final para el remanente
+    flush_batch()
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
