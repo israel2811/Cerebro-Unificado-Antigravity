@@ -17,8 +17,11 @@ except ImportError:
     print("Corre: pip install chromadb sentence-transformers")
     exit(1)
 
-CLEAN_CHUNKS_DIR = r"/workspaces/Antigravity_Cloud_Project/scripts_leviathan/clean_chunks" if os.name == 'posix' else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\clean_chunks"
-DB_PATH = r"/workspaces/Antigravity_Cloud_Project/nexus_vector_db" if os.name == 'posix' else r"C:\Users\Lenovo\Antigravity_Cloud_Project\nexus_vector_db"
+# BOLT OPTIMIZATION: Rutas dinámicas para compatibilidad con Docker y Cloud VMs.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(SCRIPT_DIR)
+CLEAN_CHUNKS_DIR = os.path.join(SCRIPT_DIR, "clean_chunks")
+DB_PATH = os.path.join(BASE_DIR, "nexus_vector_db")
 
 # BOLT OPTIMIZATION: Configuración de procesamiento por lotes
 BATCH_SIZE = 20
