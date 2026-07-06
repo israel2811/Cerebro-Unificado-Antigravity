@@ -73,7 +73,7 @@ def local_chroma_rag_inject():
         with open(ruta, "r", encoding="utf-8") as f:
             contenido = f.read()
             
-        # ⚡ OPTIMIZACIÓN BOLT: Truncamiento eficiente sin procesar el string entero 2 veces
+        # ⚡ BOLT OPTIMIZATION: Efficient truncation using maxsplit to avoid full-string splitting
         palabras = contenido.split(None, 40001)
         if len(palabras) > 40000:
             print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
