@@ -1,0 +1,3 @@
+## 2026-06-18 - [Optimized ChromaDB indexing with batching and efficient truncation]
+**Learning:** Document indexing in ChromaDB (and similar vector DBs) is significantly faster when batched, as it reduces API call overhead and allows the embedding model to process multiple documents in parallel. Furthermore, using `maxsplit` in Python's `split()` method can prevent unnecessary memory allocation and CPU cycles when only a prefix of a large string is needed for truncation.
+**Action:** Always implement batching for database write operations and use `maxsplit` for efficient string truncation in data processing pipelines.
