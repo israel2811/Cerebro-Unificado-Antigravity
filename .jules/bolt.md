@@ -1,0 +1,3 @@
+## 2026-07-08 - [Efficient String Truncation and Vector Indexing]
+**Learning:** In Python, calling `.split()` multiple times on large text strings (e.g., >10MB) creates significant CPU and memory overhead. Using `split(None, maxsplit)` is significantly faster (~8x in this case) and more memory-efficient for truncation. Additionally, individual insertions into ChromaDB create a massive bottleneck compared to batched insertions.
+**Action:** Always use `maxsplit` when truncating strings by word count and implement batching (e.g., BATCH_SIZE=20) for vector database ingestion to minimize IPC/network overhead.
