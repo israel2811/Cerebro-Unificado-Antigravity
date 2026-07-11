@@ -31,9 +31,6 @@ def clean_html_noise(raw_text):
 def semantic_chunking(clean_text):
     """Divide el texto en bloques seguros basados en el límite de palabras sin romper oraciones."""
     print("[*] Iniciando Chunking Semántico...")
-    # BOLT OPTIMIZATION: Returning the word count along with the chunk avoids the need
-    # to re-split the entire chunk string later just for logging/display purposes,
-    # saving CPU cycles in the injection loop.
     words = clean_text.split()
     chunks = []
     
@@ -47,12 +44,12 @@ def semantic_chunking(clean_text):
         if current_word_count >= MAX_WORDS_PER_CHUNK:
             # Terminar en un punto final si es posible para no cortar ideas en seco
             if word.endswith('.') or word.endswith('\n'):
-                chunks.append((" ".join(current_chunk), current_word_count))
+                chunks.append(" ".join(current_chunk))
                 current_chunk = []
                 current_word_count = 0
                 
     if current_chunk:
-         chunks.append((" ".join(current_chunk), current_word_count))
+         chunks.append(" ".join(current_chunk))
          
     return chunks
 
@@ -67,15 +64,14 @@ def upload_to_google_docs(chunks):
     
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    for i, (chunk, word_count) in enumerate(chunks, 1):
+    for i, chunk in enumerate(chunks, 1):
         doc_title = f"CORPUS_TESIS_VOL_{i}"
         file_path = os.path.join(OUTPUT_DIR, f"{doc_title}.txt")
         
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(chunk)
             
-        # BOLT OPTIMIZATION: Use pre-calculated word count instead of chunk.split()
-        print(f"[+] {doc_title} generado localmente ({word_count} palabras).")
+        print(f"[+] {doc_title} generado localmente ({len(chunk.split())} palabras).")
         # Aquí iría el código de google doc insertText
         # document = docs_service.documents().create(body={'title': doc_title}).execute()
         # docs_service.documents().batchUpdate(documentId=document.get('documentId'), body={'requests': [{'insertText': {'location': {'index': 1}, 'text': chunk}}]}).execute()
