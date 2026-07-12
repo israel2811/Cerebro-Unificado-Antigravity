@@ -43,29 +43,54 @@ def local_chroma_rag_inject():
         return
 
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
-    
-    for i, archivo in enumerate(archivos, 1):
-        ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
-        
-        with open(ruta, "r", encoding="utf-8") as f:
-            contenido = f.read()
-            
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
-            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
 
-        doc_id = f"chunk_{i}_{archivo}"
-        
+    # BATCH OPTIMIZATION: Process multiple documents in a single call to reduce overhead
+    BATCH_SIZE = 20
+    batch_docs = []
+    batch_metadatas = []
+    batch_ids = []
+
+    def flush_batch():
+        if not batch_docs:
+            return
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
+            print(f"  🚀 [BATCH] Flushing {len(batch_docs)} documents to ChromaDB...")
             collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
+                documents=batch_docs,
+                metadatas=batch_metadatas,
+                ids=batch_ids
             )
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error in batch processing: {e}")
+        finally:
+            batch_docs.clear()
+            batch_metadatas.clear()
+            batch_ids.clear()
+
+    for i, archivo in enumerate(archivos, 1):
+        ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
+
+        with open(ruta, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        # FAST TRUNCATION: Use maxsplit to avoid splitting the whole string multiple times
+        # Previous logic used .split() twice on the entire content, which is O(N) twice.
+        # split(None, 40001) stops after 40001 splits, which is much faster for large files.
+        words = contenido.split(None, 40001)
+        if len(words) > 40000:
+            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
+            contenido = " ".join(words[:40000])
+
+        doc_id = f"chunk_{i}_{archivo}"
+        batch_docs.append(contenido)
+        batch_metadatas.append({"source": archivo, "type": "nexus_chunk"})
+        batch_ids.append(doc_id)
+
+        if len(batch_docs) >= BATCH_SIZE:
+            flush_batch()
+
+    # Flush any remaining documents
+    flush_batch()
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
