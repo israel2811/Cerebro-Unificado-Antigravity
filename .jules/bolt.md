@@ -5,3 +5,7 @@
 ## 2026-07-16 - ChromaDB Batching
 **Learning:** Individual `collection.add()` calls in ChromaDB (and most vector DBs) have significant overhead. Batching documents (e.g., size 20-100) significantly improves throughput.
 **Action:** Implement batching for all vector database ingestion tasks.
+
+## 2026-07-16 - Missing Dockerfile in CI
+**Learning:** GitHub Actions workflows (like docker-publish.yml) that rely on building a Docker image will fail if the `Dockerfile` is missing from the root or context directory specified.
+**Action:** Always ensure a valid `Dockerfile` is present when configuring Docker-based CI/CD.
