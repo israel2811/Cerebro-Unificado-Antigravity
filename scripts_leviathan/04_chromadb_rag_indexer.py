@@ -51,9 +51,12 @@ def local_chroma_rag_inject():
             contenido = f.read()
             
         # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
+        # Optimizado por Bolt ⚡: Usamos split(None, 40000) con maxsplit para evitar
+        # el doble costo O(N) de separar y contar una cadena masiva.
+        palabras = contenido.split(None, 40000)
+        if len(palabras) > 40000:
             print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
+            contenido = " ".join(palabras[:40000])
 
         doc_id = f"chunk_{i}_{archivo}"
         
