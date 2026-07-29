@@ -1,0 +1,6 @@
+nexus_vector_db/
+scripts_leviathan/clean_chunks/
+*__pycache__*
+*.pyc
+*state.lock
+*.tmp
