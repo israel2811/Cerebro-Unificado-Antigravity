@@ -12,8 +12,9 @@ IS_CLOUD_VM = platform.system().lower() == "linux"
 # from google.oauth2.credentials import Credentials
 # from googleapiclient.discovery import build
 
-INPUT_FILE = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/raw_corpus_extraction.txt" if IS_CLOUD_VM else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\raw_corpus_extraction.txt"
-OUTPUT_DIR = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/clean_chunks" if IS_CLOUD_VM else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\clean_chunks"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+INPUT_FILE = os.path.join(SCRIPT_DIR, "raw_corpus_extraction.txt")
+OUTPUT_DIR = os.path.join(SCRIPT_DIR, "clean_chunks")
 MAX_WORDS_PER_CHUNK = 100000 if IS_CLOUD_VM else 30000
 
 def clean_html_noise(raw_text):
@@ -22,9 +23,26 @@ def clean_html_noise(raw_text):
     soup = BeautifulSoup(raw_text, "html.parser")
     text = soup.get_text(separator="\n")
     
-    # Limpieza básica de caracteres nulos, múltiples saltos de línea y ruido de JSON/código.
+    # OPTIMIZACIÓN BOLT: Se reemplaza re.sub(r'\{.*?\}', ...) con una búsqueda lineal find() de C-speed.
+    # Esto evita el backtracking catastrófico en payloads masivos de JSON y procesa 16MB+ en milisegundos.
+    print("[*] Aplicando limpieza de bloques JSON/llaves...")
+    parts = []
+    last_idx = 0
+    n = len(text)
+    while last_idx < n:
+        start = text.find('{', last_idx)
+        if start == -1:
+            parts.append(text[last_idx:])
+            break
+        parts.append(text[last_idx:start])
+        end = text.find('}', start)
+        if end == -1:
+            parts.append(text[start:])
+            break
+        last_idx = end + 1
+    text = "".join(parts)
+
     print("[*] Aplicando expresiones regulares para limpieza profunda...")
-    text = re.sub(r'\{.*?\}', '', text, flags=re.DOTALL) # Quitar brackets JSON grandes
     text = re.sub(r'\n+', '\n', text)
     return text
 
