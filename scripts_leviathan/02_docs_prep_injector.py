@@ -16,15 +16,40 @@ INPUT_FILE = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/raw_corpus
 OUTPUT_DIR = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/clean_chunks" if IS_CLOUD_VM else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\clean_chunks"
 MAX_WORDS_PER_CHUNK = 100000 if IS_CLOUD_VM else 30000
 
+def clean_brackets(text):
+    """
+    Removes curly brace pairs and their contents in a single-pass linear scan.
+    This avoids catastrophic regex backtracking on large or unbalanced files.
+    """
+    if '{' not in text:
+        return text
+    result = []
+    idx = 0
+    while True:
+        start = text.find('{', idx)
+        if start == -1:
+            result.append(text[idx:])
+            break
+        result.append(text[idx:start])
+        end = text.find('}', start)
+        if end == -1:
+            result.append(text[start:])
+            break
+        idx = end + 1
+    return "".join(result)
+
 def clean_html_noise(raw_text):
     """Filtra y purifica el texto, quitando HTML, JSON y ruido sintáctico."""
     print("[*] Ejecutando destilación por BeautifulSoup...")
     soup = BeautifulSoup(raw_text, "html.parser")
     text = soup.get_text(separator="\n")
     
+    # Limpieza de corchetes / brackets JSON grandes de forma eficiente y segura (Bolt Optimization)
+    print("[*] Aplicando eliminación de corchetes de forma lineal...")
+    text = clean_brackets(text)
+
     # Limpieza básica de caracteres nulos, múltiples saltos de línea y ruido de JSON/código.
-    print("[*] Aplicando expresiones regulares para limpieza profunda...")
-    text = re.sub(r'\{.*?\}', '', text, flags=re.DOTALL) # Quitar brackets JSON grandes
+    print("[*] Aplicando expresiones regulares para saltos de línea...")
     text = re.sub(r'\n+', '\n', text)
     return text
 
