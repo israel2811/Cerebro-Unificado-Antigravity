@@ -1,0 +1,3 @@
+## 2025-05-15 - ChromaDB Batch Optimization & Poisoned Batches
+**Learning:** Batching `collection.add` in ChromaDB significantly reduces IPC/Network overhead. However, failing to reset the batch state in a `finally` block after an error creates a "poisoned batch" cascade, where subsequent valid documents are appended to a failing batch, causing repeated failures. Also, using a character length heuristic (e.g., 150k chars) before `split()` prevents unnecessary memory pressure and CPU cycles on large datasets.
+**Action:** Always wrap batch operations in try-except-finally blocks to ensure state reset. Use character-based pre-filters for expensive string operations like word counting.
