@@ -43,29 +43,57 @@ def local_chroma_rag_inject():
         return
 
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
-    
-    for i, archivo in enumerate(archivos, 1):
-        ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
-        
-        with open(ruta, "r", encoding="utf-8") as f:
-            contenido = f.read()
-            
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
-            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
 
-        doc_id = f"chunk_{i}_{archivo}"
-        
+    BATCH_SIZE = 50
+    current_batch = {"documents": [], "metadatas": [], "ids": []}
+
+    def flush_batch(batch, coll):
+        if not batch["ids"]:
+            return
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
-            collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
+            coll.add(
+                documents=batch["documents"],
+                metadatas=batch["metadatas"],
+                ids=batch["ids"]
             )
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error vectorizando lote: {e}")
+        finally:
+            batch["documents"].clear()
+            batch["metadatas"].clear()
+            batch["ids"].clear()
+
+    try:
+        for i, archivo in enumerate(archivos, 1):
+            ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
+
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read()
+
+            # Segmentación preventiva (Chroma tiene límite por lote)
+            if len(contenido.split()) > 40000:
+                print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
+                contenido = " ".join(contenido.split()[:40000])
+
+            doc_id = f"chunk_{i}_{archivo}"
+
+            current_batch["documents"].append(contenido)
+            current_batch["metadatas"].append({"source": archivo, "type": "nexus_chunk"})
+            current_batch["ids"].append(doc_id)
+
+            if len(current_batch["ids"]) >= BATCH_SIZE:
+                print(f"  -> [{i}/{len(archivos)}] Incrustando lote...")
+                flush_batch(current_batch, collection)
+
+        # Finalizar cualquier documento restante
+        if current_batch["ids"]:
+            print(f"  -> [{len(archivos)}/{len(archivos)}] Incrustando lote final...")
+            flush_batch(current_batch, collection)
+    finally:
+        # Asegurar que la memoria se limpie si algo falla
+        current_batch["documents"].clear()
+        current_batch["metadatas"].clear()
+        current_batch["ids"].clear()
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
