@@ -44,8 +44,12 @@ def build_omni_knowledge_graph():
     
     print(f"[*] Inyectando {len(triplas_fundacionales)} Triplas Cognitivas Fundacionales...")
     
-    for sujeto, predicado, objeto in triplas_fundacionales:
-        G.add_edge(sujeto, objeto, relation=predicado)
+    # Bolt Optimization: Use add_edges_from for bulk insertion into NetworkX graph,
+    # avoiding repeated Python function call overhead and leveraging internal vector/dict initialization routines.
+    G.add_edges_from(
+        (sujeto, objeto, {"relation": predicado})
+        for sujeto, predicado, objeto in triplas_fundacionales
+    )
         
     # Guardar para compatibilidad universal (Se puede abrir en software Gephi)
     os.makedirs(os.path.dirname(GRAPH_FILE_PATH), exist_ok=True)
