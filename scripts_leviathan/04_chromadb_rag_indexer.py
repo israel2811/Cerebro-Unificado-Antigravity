@@ -42,8 +42,17 @@ def local_chroma_rag_inject():
         print("[!] No hay chunks de texto para procesar.")
         return
 
+    # Ordenar determinísticamente
+    archivos.sort()
+
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
     
+    # BATCHING OPTIMIZATION: Lotes de 20 documentos para minimizar IPC/DB transactions y acelerar vectorización
+    BATCH_SIZE = 20
+    batch_docs = []
+    batch_metas = []
+    batch_ids = []
+
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
@@ -51,21 +60,42 @@ def local_chroma_rag_inject():
             contenido = f.read()
             
         # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
+        # OPTIMIZACIÓN: split(None, 40001) para evitar doble split y consumo excesivo de RAM
+        words = contenido.split(None, 40001)
+        if len(words) > 40000:
             print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
+            contenido = " ".join(words[:40000])
 
         doc_id = f"chunk_{i}_{archivo}"
-        
+        batch_docs.append(contenido)
+        batch_metas.append({"source": archivo, "type": "nexus_chunk"})
+        batch_ids.append(doc_id)
+
+        if len(batch_docs) >= BATCH_SIZE:
+            try:
+                print(f"  -> [{i}/{len(archivos)}] Incrustando lote de {len(batch_docs)} documentos...")
+                collection.add(
+                    documents=list(batch_docs),
+                    metadatas=list(batch_metas),
+                    ids=list(batch_ids)
+                )
+            except Exception as e:
+                print(f"  [X] Error vectorizando lote en {archivo}: {e}")
+            batch_docs.clear()
+            batch_metas.clear()
+            batch_ids.clear()
+
+    # Inyectar lote remanente si existiera
+    if batch_docs:
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
+            print(f"  -> [{len(archivos)}/{len(archivos)}] Incrustando lote final de {len(batch_docs)} documentos...")
             collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
+                documents=list(batch_docs),
+                metadatas=list(batch_metas),
+                ids=list(batch_ids)
             )
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error vectorizando lote final: {e}")
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
