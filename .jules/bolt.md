@@ -1,0 +1,3 @@
+## 2026-02-28 - Avoid Binary Chunk Decoding Across Boundaries for Text Files
+**Learning:** Decoding raw binary chunks (`infile.read(CHUNK_SIZE_BYTES)`) with `decode("utf-8", errors="ignore")` can corrupt multi-byte UTF-8 characters that fall across chunk boundaries. A safer, zero-allocation optimization to compute byte counts without string re-encoding (`len(chunk.encode("utf-8"))`) is to retrieve `os.path.getsize(filepath)` upfront before reading in text mode.
+**Action:** Use `os.path.getsize(filepath)` to get byte sizes of files rather than re-encoding string chunks or splitting binary streams when reading text files.
