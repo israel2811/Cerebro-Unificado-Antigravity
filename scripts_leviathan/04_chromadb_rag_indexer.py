@@ -44,28 +44,52 @@ def local_chroma_rag_inject():
 
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
     
+    # BATCH_SIZE optimizado para reducir latencia de red/disco y overhead de transacción
+    BATCH_SIZE = 50
+    batch_docs = []
+    batch_metadatas = []
+    batch_ids = []
+    MAX_WORDS = 40000
+
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
-        with open(ruta, "r", encoding="utf-8") as f:
-            contenido = f.read()
-            
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
-            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
-
-        doc_id = f"chunk_{i}_{archivo}"
-        
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
-            collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
-            )
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read()
+
+            # BOLT OPTIMIZATION: Uso de split(None, MAX+1) para evitar tokenizar todo el string innecesariamente
+            # Esto previene OOM y reduce ciclos de CPU en archivos masivos.
+            words = contenido.split(None, MAX_WORDS + 1)
+            if len(words) > MAX_WORDS:
+                print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
+                contenido = " ".join(words[:MAX_WORDS])
+
+            doc_id = f"chunk_{i}_{archivo}"
+            
+            batch_docs.append(contenido)
+            batch_metadatas.append({"source": archivo, "type": "nexus_chunk"})
+            batch_ids.append(doc_id)
+
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error procesando {archivo}: {e}")
+
+        # Ejecutar inyección por lotes (Batching)
+        # Se ejecuta fuera del try de procesamiento de archivo para asegurar que
+        # los documentos procesados con éxito se inyecten incluso si el siguiente falla.
+        if len(batch_docs) >= BATCH_SIZE or (i == len(archivos) and batch_docs):
+            try:
+                print(f"  -> [{i}/{len(archivos)}] Inyectando lote de {len(batch_docs)} documentos...")
+                collection.add(
+                    documents=batch_docs,
+                    metadatas=batch_metadatas,
+                    ids=batch_ids
+                )
+            except Exception as e:
+                print(f"  [X] Error en inyección de lote: {e}")
+            finally:
+                # Limpiar lote siempre para evitar 'poisoned batches' en reintentos
+                batch_docs, batch_metadatas, batch_ids = [], [], []
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
