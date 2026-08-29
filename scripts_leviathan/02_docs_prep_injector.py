@@ -18,88 +18,90 @@ MAX_WORDS_PER_CHUNK = 100000 if IS_CLOUD_VM else 30000
 
 def clean_html_noise(raw_text):
     """Filtra y purifica el texto, quitando HTML, JSON y ruido sintáctico."""
-    print("[*] Ejecutando destilación por BeautifulSoup...")
     soup = BeautifulSoup(raw_text, "html.parser")
     text = soup.get_text(separator="\n")
     
     # Limpieza básica de caracteres nulos, múltiples saltos de línea y ruido de JSON/código.
-    print("[*] Aplicando expresiones regulares para limpieza profunda...")
     text = re.sub(r'\{.*?\}', '', text, flags=re.DOTALL) # Quitar brackets JSON grandes
     text = re.sub(r'\n+', '\n', text)
     return text
 
-def semantic_chunking(clean_text):
-    """Divide el texto en bloques seguros basados en el límite de palabras sin romper oraciones."""
-    print("[*] Iniciando Chunking Semántico...")
-    words = clean_text.split()
-    chunks = []
-    
-    current_chunk = []
-    current_word_count = 0
-    
-    for word in words:
-        current_chunk.append(word)
-        current_word_count += 1
-        
-        if current_word_count >= MAX_WORDS_PER_CHUNK:
-            # Terminar en un punto final si es posible para no cortar ideas en seco
-            if word.endswith('.') or word.endswith('\n'):
-                chunks.append(" ".join(current_chunk))
-                current_chunk = []
-                current_word_count = 0
-                
-    if current_chunk:
-         chunks.append(" ".join(current_chunk))
-         
-    return chunks
+def stream_corpus(filepath):
+    """Generador que lee el corpus y devuelve documentos individuales basados en el delimitador de ORIGEN."""
+    current_doc = []
+    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            if line.startswith("--- ORIGEN:"):
+                if current_doc:
+                    yield "".join(current_doc)
+                    current_doc = []
+                current_doc.append(line)
+                continue
+            current_doc.append(line)
+        if current_doc:
+            yield "".join(current_doc)
 
-def upload_to_google_docs(chunks):
-    """Inyector automatizado hacia la Nube de Google."""
-    print(f"[*] Preparando inyección de {len(chunks)} volúmenes a Google Docs...")
+def upload_to_google_docs(word_list, index):
+    """Inyector automatizado hacia la Nube de Google. (Optimizado para streaming)"""
+    doc_title = f"CORPUS_TESIS_VOL_{index}"
+    file_path = os.path.join(OUTPUT_DIR, f"{doc_title}.txt")
     
+    # 1. Persistencia Local
+    chunk_text = " ".join(word_list)
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(chunk_text)
+
+    print(f"[+] {doc_title} generado localmente ({len(word_list)} palabras).")
+
+    # 2. Inyección Cloud (Placeholder para futuras implementaciones)
     # Simulación de la conexión a API (Armadura lista para inyectar token oauth)
     # creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     # docs_service = build('docs', 'v1', credentials=creds)
     # drive_service = build('drive', 'v3', credentials=creds)
     
+    # Aquí iría el código de google doc insertText
+    # document = docs_service.documents().create(body={'title': doc_title}).execute()
+    # docs_service.documents().batchUpdate(documentId=document.get('documentId'), body={'requests': [{'insertText': {'location': {'index': 1}, 'text': chunk_text}}]}).execute()
+
+def process_and_inject_streaming(input_file):
+    """Versión optimizada que procesa el corpus en streaming para minimizar el uso de RAM."""
+    print("[*] Iniciando Inyección por Streaming (Optimización Bolt ⚡)")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    for i, chunk in enumerate(chunks, 1):
-        doc_title = f"CORPUS_TESIS_VOL_{i}"
-        file_path = os.path.join(OUTPUT_DIR, f"{doc_title}.txt")
+    current_chunk_words = []
+    current_word_count = 0
+    volume_count = 1
+
+    for raw_doc in stream_corpus(input_file):
+        cleaned_doc = clean_html_noise(raw_doc)
+        # bolt: preserve punctuation for boundary check but split by space
+        words = cleaned_doc.split()
         
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(chunk)
+        for word in words:
+            current_chunk_words.append(word)
+            current_word_count += 1
             
-        print(f"[+] {doc_title} generado localmente ({len(chunk.split())} palabras).")
-        # Aquí iría el código de google doc insertText
-        # document = docs_service.documents().create(body={'title': doc_title}).execute()
-        # docs_service.documents().batchUpdate(documentId=document.get('documentId'), body={'requests': [{'insertText': {'location': {'index': 1}, 'text': chunk}}]}).execute()
-        
+            if current_word_count >= MAX_WORDS_PER_CHUNK:
+                # Terminar en un punto final para no cortar ideas en seco
+                # Nota: words de .split() no tienen \n, pero sí conservan el punto final.
+                if word.endswith('.'):
+                    upload_to_google_docs(current_chunk_words, volume_count)
+                    volume_count += 1
+                    current_chunk_words = []
+                    current_word_count = 0
+
         if not IS_CLOUD_VM:
-            gc.collect() # Prevenir OOM en iteraciones grandes sólo en Windows Local
+            gc.collect()
+
+    # Flush final
+    if current_chunk_words:
+        upload_to_google_docs(current_chunk_words, volume_count)
 
 if __name__ == "__main__":
-    print("[*] Iniciando PROTOCOLO 2: DOCTOR INJECTOR")
+    print("[*] Iniciando PROTOCOLO 2: DOCTOR INJECTOR (STREAMING EDITION)")
     if not os.path.exists(INPUT_FILE):
         print(f"[!] Archivo {INPUT_FILE} no encontrado. Ejecuta Protocolo 1 primero.")
         exit(1)
         
-    print("[*] Cargando corpus en bloques...")
-    # Para 2GB de RAM, leemos e iteramos todo. Si el txt es muy grande (>500MB), 
-    # se adaptará la lectura en streaming. Por ahora cargamos con optimización gc.
-    with open(INPUT_FILE, "r", encoding="utf-8", errors="ignore") as f:
-        raw_data = f.read()
-        
-    cleaned = clean_html_noise(raw_data)
-    del raw_data # Liberar memoria volátil masiva
-    if not IS_CLOUD_VM:
-        gc.collect()
-    
-    volumenes = semantic_chunking(cleaned)
-    del cleaned
-    if not IS_CLOUD_VM:
-        gc.collect()
-    
-    upload_to_google_docs(volumenes)
-    print("[+] Protocolo 2 Finalizado. Data Lake preparado.")
+    process_and_inject_streaming(INPUT_FILE)
+    print("[+] Protocolo 2 Finalizado. Data Lake preparado con mínima huella de RAM.")
