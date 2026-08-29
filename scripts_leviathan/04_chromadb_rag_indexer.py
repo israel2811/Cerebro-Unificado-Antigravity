@@ -44,30 +44,50 @@ def local_chroma_rag_inject():
 
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
     
+    # Optimizaciones BOLT: Procesamiento por lotes y heurística de longitud
+    BATCH_SIZE = 50
+    current_batch = {"documents": [], "metadatas": [], "ids": []}
+
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
         with open(ruta, "r", encoding="utf-8") as f:
             contenido = f.read()
             
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
-            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
+        # BOLT OPTIMIZATION: Heurística de conteo de caracteres para evitar split() costoso
+        # Se asume que 150k caracteres es el umbral de seguridad para ~40k palabras.
+        if len(contenido) > 150000:
+            words = contenido.split()
+            if len(words) > 40000:
+                print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
+                contenido = " ".join(words[:40000])
 
         doc_id = f"chunk_{i}_{archivo}"
-        
-        try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
-            collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
-            )
-        except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+        current_batch["documents"].append(contenido)
+        current_batch["metadatas"].append({"source": archivo, "type": "nexus_chunk"})
+        current_batch["ids"].append(doc_id)
 
-    print("\n✅ [CHROMADB RAG] Inyección Completada.")
+        # Inyección por lotes (Reduce latencia de red e IPC)
+        if len(current_batch["ids"]) >= BATCH_SIZE:
+            try:
+                print(f"  -> [{i}/{len(archivos)}] Incrustando lote de {len(current_batch['ids'])}...")
+                collection.add(**current_batch)
+            except Exception as e:
+                # El manejo de errores en lotes evita que un solo error detenga el pipeline
+                print(f"  [X] Error vectorizando lote cerca de {archivo}: {e}")
+            finally:
+                # Reset atómico del lote para evitar 'poisoned batches'
+                current_batch = {"documents": [], "metadatas": [], "ids": []}
+
+    # Flush final (Procesar remanentes)
+    if current_batch["ids"]:
+        try:
+            print(f"  -> Finalizando inyección de {len(current_batch['ids'])} restantes...")
+            collection.add(**current_batch)
+        except Exception as e:
+            print(f"  [X] Error vectorizando lote final: {e}")
+
+    print("\n✅ [CHROMADB RAG] Inyección Completada con Optimizaciones Bolt.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
     print("🎯 Ahora puedes consultar a Claude o ChatGPT usando búsqueda de similitud por cosenos local.")
 
