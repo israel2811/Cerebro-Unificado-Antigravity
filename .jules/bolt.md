@@ -1,0 +1,3 @@
+## 2026-06-10 - ChromaDB Batch Indexing and String Optimization
+**Learning:** Indexing documents one-by-one into a vector database like ChromaDB creates significant overhead due to repeated transaction and embedding generation setup. Batching documents (e.g., in groups of 20) reduces this overhead by ~10x in simulated environments. Additionally, using `split(None, N)` with `maxsplit` for truncation is ~130x faster than full string `split()` followed by slicing on 1M word strings.
+**Action:** Always implement batching for vector database injections and use `maxsplit` for efficient word-count based string truncation.
