@@ -12,8 +12,9 @@ IS_CLOUD_VM = platform.system().lower() == "linux"
 # from google.oauth2.credentials import Credentials
 # from googleapiclient.discovery import build
 
-INPUT_FILE = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/raw_corpus_extraction.txt" if IS_CLOUD_VM else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\raw_corpus_extraction.txt"
-OUTPUT_DIR = "/workspaces/Antigravity_Cloud_Project/scripts_leviathan/clean_chunks" if IS_CLOUD_VM else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\clean_chunks"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+INPUT_FILE = os.path.join(BASE_DIR, "raw_corpus_extraction.txt")
+OUTPUT_DIR = os.path.join(BASE_DIR, "clean_chunks")
 MAX_WORDS_PER_CHUNK = 100000 if IS_CLOUD_VM else 30000
 
 def clean_html_noise(raw_text):
