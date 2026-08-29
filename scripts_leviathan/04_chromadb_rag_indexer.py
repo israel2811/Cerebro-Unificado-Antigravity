@@ -44,28 +44,49 @@ def local_chroma_rag_inject():
 
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
     
+    docs, metadatas, ids = [], [], []
+    BATCH_SIZE = 50
+
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
-        with open(ruta, "r", encoding="utf-8") as f:
-            contenido = f.read()
-            
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
-            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
-
-        doc_id = f"chunk_{i}_{archivo}"
-        
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
-            collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
-            )
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read()
+
+            # BOLT OPTIMIZATION: Heurística de longitud de caracteres para evitar split() costoso.
+            # 200,000 chars es aprox 40,000 palabras (promedio 5 chars/palabra).
+            if len(contenido) > 200000:
+                # Usar maxsplit para evitar procesar todo el buffer si solo necesitamos los primeros 40k
+                words = contenido.split(None, 40001)
+                if len(words) > 40000:
+                    print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
+                    contenido = " ".join(words[:40000])
+
+            docs.append(contenido)
+            metadatas.append({"source": archivo, "type": "nexus_chunk"})
+            ids.append(f"chunk_{i}_{archivo}")
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error leyendo {archivo}: {e}")
+            continue
+
+        # BOLT OPTIMIZATION: El procesamiento por lotes reduce la sobrecarga de red/IPC y permite vectorización.
+        if len(docs) >= BATCH_SIZE:
+            try:
+                print(f"  -> [{i}/{len(archivos)}] Inyectando lote de {len(docs)} documentos...")
+                collection.add(documents=docs, metadatas=metadatas, ids=ids)
+            except Exception as e:
+                print(f"  [X] Error inyectando lote cerca de {archivo}: {e}")
+            finally:
+                docs, metadatas, ids = [], [], []
+
+    # Inyectar el último lote si quedó algo pendiente
+    if docs:
+        try:
+            print(f"  -> Finalizando inyección de los últimos {len(docs)} documentos...")
+            collection.add(documents=docs, metadatas=metadatas, ids=ids)
+        except Exception as e:
+            print(f"  [X] Error en inyección final: {e}")
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
