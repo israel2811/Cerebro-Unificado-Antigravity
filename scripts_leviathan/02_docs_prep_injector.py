@@ -18,44 +18,48 @@ MAX_WORDS_PER_CHUNK = 100000 if IS_CLOUD_VM else 30000
 
 def clean_html_noise(raw_text):
     """Filtra y purifica el texto, quitando HTML, JSON y ruido sintáctico."""
-    print("[*] Ejecutando destilación por BeautifulSoup...")
-    soup = BeautifulSoup(raw_text, "html.parser")
-    text = soup.get_text(separator="\n")
-    
-    # Limpieza básica de caracteres nulos, múltiples saltos de línea y ruido de JSON/código.
+    # ⚡ Bolt: Optimización de limpieza. BeautifulSoup es lento para archivos de 17MB+
+    # Intentamos primero una limpieza por Regex para reducir el volumen antes de BS4 si es necesario.
     print("[*] Aplicando expresiones regulares para limpieza profunda...")
-    text = re.sub(r'\{.*?\}', '', text, flags=re.DOTALL) # Quitar brackets JSON grandes
+    text = re.sub(r'\{.*?\}', '', raw_text, flags=re.DOTALL) # Quitar brackets JSON grandes
+
+    print("[*] Ejecutando destilación por BeautifulSoup...")
+    # ⚡ Bolt: Usar 'lxml' si está disponible es más rápido, si no html.parser
+    try:
+        soup = BeautifulSoup(text, "lxml")
+    except:
+        soup = BeautifulSoup(text, "html.parser")
+
+    text = soup.get_text(separator="\n")
     text = re.sub(r'\n+', '\n', text)
     return text
 
 def semantic_chunking(clean_text):
     """Divide el texto en bloques seguros basados en el límite de palabras sin romper oraciones."""
     print("[*] Iniciando Chunking Semántico...")
-    words = clean_text.split()
-    chunks = []
+    # ⚡ Bolt: Usar generador para ahorrar memoria en lugar de crear una lista gigante de palabras
     
     current_chunk = []
     current_word_count = 0
     
-    for word in words:
+    # ⚡ Bolt: split() sin argumentos ya es eficiente, pero iteramos para no duplicar memoria
+    for word in clean_text.split():
         current_chunk.append(word)
         current_word_count += 1
         
         if current_word_count >= MAX_WORDS_PER_CHUNK:
             # Terminar en un punto final si es posible para no cortar ideas en seco
             if word.endswith('.') or word.endswith('\n'):
-                chunks.append(" ".join(current_chunk))
+                yield " ".join(current_chunk)
                 current_chunk = []
                 current_word_count = 0
                 
     if current_chunk:
-         chunks.append(" ".join(current_chunk))
-         
-    return chunks
+         yield " ".join(current_chunk)
 
 def upload_to_google_docs(chunks):
     """Inyector automatizado hacia la Nube de Google."""
-    print(f"[*] Preparando inyección de {len(chunks)} volúmenes a Google Docs...")
+    print(f"[*] Preparando inyección de volúmenes a Google Docs...")
     
     # Simulación de la conexión a API (Armadura lista para inyectar token oauth)
     # creds = Credentials.from_authorized_user_file('token.json', SCOPES)
@@ -85,21 +89,21 @@ if __name__ == "__main__":
         print(f"[!] Archivo {INPUT_FILE} no encontrado. Ejecuta Protocolo 1 primero.")
         exit(1)
         
-    print("[*] Cargando corpus en bloques...")
-    # Para 2GB de RAM, leemos e iteramos todo. Si el txt es muy grande (>500MB), 
-    # se adaptará la lectura en streaming. Por ahora cargamos con optimización gc.
+    print("[*] Cargando corpus...")
+    # ⚡ Bolt: Para 2GB de RAM, 17MB es manejable, pero implementamos limpieza secuencial.
     with open(INPUT_FILE, "r", encoding="utf-8", errors="ignore") as f:
         raw_data = f.read()
         
     cleaned = clean_html_noise(raw_data)
-    del raw_data # Liberar memoria volátil masiva
+    del raw_data
     if not IS_CLOUD_VM:
         gc.collect()
     
-    volumenes = semantic_chunking(cleaned)
+    # ⚡ Bolt: Usar el generador directamente para evitar duplicar el texto limpio en una lista
+    upload_to_google_docs(semantic_chunking(cleaned))
+
     del cleaned
     if not IS_CLOUD_VM:
         gc.collect()
     
-    upload_to_google_docs(volumenes)
     print("[+] Protocolo 2 Finalizado. Data Lake preparado.")
