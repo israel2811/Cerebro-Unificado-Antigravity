@@ -1,0 +1,3 @@
+## 2026-05-24 - Streaming Document Processing in 02_docs_prep_injector
+**Learning:** Monolithic processing of a 17MB corpus using `f.read()`, `BeautifulSoup`, and `re.sub` on the entire string caused memory to balloon to ~250MB. This occurs because each transformation creates new large string objects in memory.
+**Action:** Implement document-level streaming using a line-by-line reader that detects document boundaries (markers). By processing one document at a time through the pipeline and yielding chunks via a generator, peak memory was reduced by ~7x (to ~36MB), making the script stable for 2GB RAM environments even as the corpus grows.
