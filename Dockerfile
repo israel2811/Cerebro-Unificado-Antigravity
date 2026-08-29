@@ -11,3 +11,4 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 # Set up workspace
 WORKDIR /workspace
+COPY . .
