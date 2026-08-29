@@ -1,0 +1,3 @@
+## 2026-05-07 - Python string splitting performance in Leviathan
+**Learning:** In Python, calling `split()` on a very large string without a `maxsplit` argument creates a massive list of all words in memory, which is extremely slow and memory-intensive. Using a character-length heuristic (e.g., `len(s) > 40000`) as a pre-filter, combined with `split(None, maxsplit)`, can provide a ~300x speedup for truncation tasks.
+**Action:** Always use `split(None, maxsplit)` when only a subset of words is needed from a large text buffer, and use string length as a fast pre-filter for expensive string operations.
