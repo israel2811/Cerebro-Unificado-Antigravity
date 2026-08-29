@@ -53,53 +53,62 @@ def semantic_chunking(clean_text):
          
     return chunks
 
-def upload_to_google_docs(chunks):
+def stream_corpus_documents(filepath):
+    """Generador que lee el corpus línea a línea y entrega documentos por separado."""
+    current_doc = []
+    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            if line.startswith("--- ORIGEN:"):
+                if current_doc:
+                    yield "".join(current_doc)
+                    current_doc = []
+            current_doc.append(line)
+        if current_doc:
+            yield "".join(current_doc)
+
+def upload_to_google_docs(chunks, global_counter):
     """Inyector automatizado hacia la Nube de Google."""
     print(f"[*] Preparando inyección de {len(chunks)} volúmenes a Google Docs...")
     
-    # Simulación de la conexión a API (Armadura lista para inyectar token oauth)
-    # creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    # docs_service = build('docs', 'v1', credentials=creds)
-    # drive_service = build('drive', 'v3', credentials=creds)
-    
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    for i, chunk in enumerate(chunks, 1):
-        doc_title = f"CORPUS_TESIS_VOL_{i}"
+    for chunk in chunks:
+        global_counter += 1
+        doc_title = f"CORPUS_TESIS_VOL_{global_counter}"
         file_path = os.path.join(OUTPUT_DIR, f"{doc_title}.txt")
         
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(chunk)
             
         print(f"[+] {doc_title} generado localmente ({len(chunk.split())} palabras).")
-        # Aquí iría el código de google doc insertText
-        # document = docs_service.documents().create(body={'title': doc_title}).execute()
-        # docs_service.documents().batchUpdate(documentId=document.get('documentId'), body={'requests': [{'insertText': {'location': {'index': 1}, 'text': chunk}}]}).execute()
         
         if not IS_CLOUD_VM:
-            gc.collect() # Prevenir OOM en iteraciones grandes sólo en Windows Local
+            gc.collect()
+
+    return global_counter
 
 if __name__ == "__main__":
-    print("[*] Iniciando PROTOCOLO 2: DOCTOR INJECTOR")
+    print("[*] Iniciando PROTOCOLO 2: DOCTOR INJECTOR (STREAMING MODE)")
     if not os.path.exists(INPUT_FILE):
         print(f"[!] Archivo {INPUT_FILE} no encontrado. Ejecuta Protocolo 1 primero.")
         exit(1)
         
-    print("[*] Cargando corpus en bloques...")
-    # Para 2GB de RAM, leemos e iteramos todo. Si el txt es muy grande (>500MB), 
-    # se adaptará la lectura en streaming. Por ahora cargamos con optimización gc.
-    with open(INPUT_FILE, "r", encoding="utf-8", errors="ignore") as f:
-        raw_data = f.read()
-        
-    cleaned = clean_html_noise(raw_data)
-    del raw_data # Liberar memoria volátil masiva
-    if not IS_CLOUD_VM:
-        gc.collect()
+    print("[*] Procesando corpus en streaming para optimizar RAM...")
+
+    global_chunk_count = 0
     
-    volumenes = semantic_chunking(cleaned)
-    del cleaned
-    if not IS_CLOUD_VM:
-        gc.collect()
+    for doc_content in stream_corpus_documents(INPUT_FILE):
+        # Procesar cada documento de forma independiente para mantener baja la RAM
+        cleaned = clean_html_noise(doc_content)
+        del doc_content
+
+        volumenes = semantic_chunking(cleaned)
+        del cleaned
+
+        global_chunk_count = upload_to_google_docs(volumenes, global_chunk_count)
+        del volumenes
+
+        if not IS_CLOUD_VM:
+            gc.collect()
     
-    upload_to_google_docs(volumenes)
     print("[+] Protocolo 2 Finalizado. Data Lake preparado.")
