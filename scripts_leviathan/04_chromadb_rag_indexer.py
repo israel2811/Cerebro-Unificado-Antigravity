@@ -43,29 +43,47 @@ def local_chroma_rag_inject():
         return
 
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
-    
-    for i, archivo in enumerate(archivos, 1):
-        ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
-        
-        with open(ruta, "r", encoding="utf-8") as f:
-            contenido = f.read()
-            
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
-            print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
 
-        doc_id = f"chunk_{i}_{archivo}"
-        
-        try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
-            collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
-            )
-        except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+    BATCH_SIZE = 50
+    current_batch = {"documents": [], "metadatas": [], "ids": []}
+
+    try:
+        for i, archivo in enumerate(archivos, 1):
+            ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
+            
+            with open(ruta, "r", encoding="utf-8") as f:
+                contenido = f.read()
+
+            # Optimización de rendimiento: Heurística de longitud de caracteres (Bolt ⚡)
+            # Evita llamar al costoso .split() si el contenido es claramente pequeño (<150k chars ≈ 25k words)
+            if len(contenido) > 150000:
+                words = contenido.split()
+                if len(words) > 40000:
+                    print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
+                    contenido = " ".join(words[:40000])
+
+            doc_id = f"chunk_{i}_{archivo}"
+
+            # Acumular en lote para reducir el overhead de red/IPC (Bolt ⚡)
+            current_batch["documents"].append(contenido)
+            current_batch["metadatas"].append({"source": archivo, "type": "nexus_chunk"})
+            current_batch["ids"].append(doc_id)
+
+            if len(current_batch["ids"]) >= BATCH_SIZE:
+                print(f"  -> Inyectando lote de {len(current_batch['ids'])} documentos (Progreso: {i}/{len(archivos)})...")
+                collection.add(**current_batch)
+                current_batch = {"documents": [], "metadatas": [], "ids": []}
+
+        # Flush final del último lote
+        if current_batch["ids"]:
+            print(f"  -> Finalizando inyección de los últimos {len(current_batch['ids'])} documentos...")
+            collection.add(**current_batch)
+
+    except Exception as e:
+        print(f"  [X] Error crítico durante la vectorización: {e}")
+    finally:
+        # Asegurar limpieza de memoria en caso de errores masivos
+        del current_batch
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
