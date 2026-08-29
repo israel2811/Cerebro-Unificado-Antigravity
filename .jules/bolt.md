@@ -1,0 +1,3 @@
+## 2026-06-15 - [Avoid Redundant Full String Splitting]
+**Learning:** Using `string.split()` without arguments on very large strings is expensive as it parses the entire string and allocates a list of all words. If only a limited number of words or a count is needed, `split(None, limit)` is significantly faster and more memory-efficient. Additionally, passing pre-calculated word counts between functions avoids redundant re-splitting.
+**Action:** Always use `maxsplit` parameter with `split()` when a full split is not required, and propagate calculated metadata like word counts instead of re-deriving them in downstream loops.
