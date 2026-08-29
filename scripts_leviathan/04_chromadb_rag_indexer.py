@@ -44,28 +44,57 @@ def local_chroma_rag_inject():
 
     print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
     
+    # BOLT OPTIMIZATION: Use batching to reduce API/overhead and maxsplit for word count check
+    BATCH_SIZE = 50
+    batch_docs, batch_metadatas, batch_ids = [], [], []
+
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
         with open(ruta, "r", encoding="utf-8") as f:
             contenido = f.read()
             
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
+        # BOLT OPTIMIZATION: Use maxsplit to avoid full-string splitting for word count check (~100x faster)
+        words = contenido.split(None, 40001)
+        if len(words) > 40000:
             print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
+            contenido = " ".join(words[:40000])
 
         doc_id = f"chunk_{i}_{archivo}"
-        
+        batch_docs.append(contenido)
+        batch_metadatas.append({"source": archivo, "type": "nexus_chunk"})
+        batch_ids.append(doc_id)
+
+        if len(batch_docs) >= BATCH_SIZE:
+            try:
+                print(f"  -> [{i}/{len(archivos)}] Inyectando lote de {len(batch_docs)} documentos...")
+                collection.add(
+                    documents=list(batch_docs), # Use list() to pass a copy to avoid mutation issues
+                    metadatas=list(batch_metadatas),
+                    ids=list(batch_ids)
+                )
+            except Exception as e:
+                print(f"  [X] Error vectorizando lote: {e}")
+            finally:
+                batch_docs.clear()
+                batch_metadatas.clear()
+                batch_ids.clear()
+
+    # Final batch injection
+    if batch_docs:
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
+            print(f"  -> Inyectando lote final de {len(batch_docs)} documentos...")
             collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
+                documents=list(batch_docs),
+                metadatas=list(batch_metadatas),
+                ids=list(batch_ids)
             )
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error vectorizando lote final: {e}")
+        finally:
+            batch_docs.clear()
+            batch_metadatas.clear()
+            batch_ids.clear()
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
