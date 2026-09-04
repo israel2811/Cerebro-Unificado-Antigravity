@@ -1,0 +1,3 @@
+## 2026-02-23 - [Unused Matplotlib Import & Bulk Edge Insertion in NetworkX]
+**Learning:** Top-level importing heavy plotting libraries (`matplotlib.pyplot`) in background graph scripts introduces substantial import overhead (~400ms) and creates unnecessary dependency failures when plotting is not executed. In addition, NetworkX `G.add_edges_from()` with a tuple generator avoids Python loop call overhead compared to per-edge `G.add_edge()` calls during graph construction.
+**Action:** Omit unused visualization library imports in background data processing modules and use NetworkX bulk methods (`G.add_edges_from`) for edge creation.
