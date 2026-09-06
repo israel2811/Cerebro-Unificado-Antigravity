@@ -1,0 +1,9 @@
+networkx
+chromadb
+sentence-transformers
+beautifulsoup4
+pydantic
+aiofiles
+matplotlib
+fastapi
+uvicorn
