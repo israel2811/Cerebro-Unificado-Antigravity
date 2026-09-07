@@ -1,4 +1,4 @@
-name: NEXUS Omni Swarm Batch
+﻿name: NEXUS Omni Swarm Batch
 
 on:
   workflow_dispatch:
@@ -92,7 +92,7 @@ jobs:
           name: nexus-result-${{ github.run_id }}
           path: .nexus-artifacts/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 7`r`n          include-hidden-files: true
 
       - name: Job summary
         if: always()
@@ -103,3 +103,4 @@ jobs:
           echo "- job_id: ${{ steps.cfg.outputs.job_id }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- run_id: ${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
           echo '- worker: github-actions' >> "$GITHUB_STEP_SUMMARY"
+
