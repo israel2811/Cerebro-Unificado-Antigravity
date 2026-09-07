@@ -1,0 +1,105 @@
+name: NEXUS Omni Swarm Batch
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Finite worker mode
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - inventory
+          - split-corpus
+      job_id:
+        description: Optional NEXUS Neon job id
+        required: false
+        default: ''
+        type: string
+      source_path:
+        description: Repository-relative source path
+        required: false
+        default: ''
+        type: string
+      chunk_mb:
+        description: Chunk size for split-corpus
+        required: false
+        default: '4'
+        type: string
+  repository_dispatch:
+    types: [nexus-job]
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/omni_swarm_extractor.yml'
+      - 'scripts_leviathan/nexus_batch_worker.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-omni-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Resolve job inputs
+        id: cfg
+        shell: bash
+        env:
+          MODE_INPUT: ${{ inputs.mode }}
+          JOB_INPUT: ${{ inputs.job_id }}
+          SOURCE_INPUT: ${{ inputs.source_path }}
+          CHUNK_INPUT: ${{ inputs.chunk_mb }}
+          MODE_DISPATCH: ${{ github.event.client_payload.mode }}
+          JOB_DISPATCH: ${{ github.event.client_payload.job_id }}
+          SOURCE_DISPATCH: ${{ github.event.client_payload.source_path }}
+          CHUNK_DISPATCH: ${{ github.event.client_payload.chunk_mb }}
+        run: |
+          mode="${MODE_INPUT:-${MODE_DISPATCH:-validate}}"
+          job_id="${JOB_INPUT:-${JOB_DISPATCH:-}}"
+          source="${SOURCE_INPUT:-${SOURCE_DISPATCH:-}}"
+          chunk_mb="${CHUNK_INPUT:-${CHUNK_DISPATCH:-4}}"
+          case "$mode" in validate|inventory|split-corpus) ;; *) echo "Unsupported mode: $mode" >&2; exit 2 ;; esac
+          [[ "$chunk_mb" =~ ^[0-9]+$ ]] || { echo 'chunk_mb must be numeric' >&2; exit 2; }
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+          echo "chunk_mb=$chunk_mb" >> "$GITHUB_OUTPUT"
+      - name: Run finite NEXUS worker
+        shell: bash
+        run: |
+          args=(--mode '${{ steps.cfg.outputs.mode }}' --chunk-mb '${{ steps.cfg.outputs.chunk_mb }}')
+          if [ -n '${{ steps.cfg.outputs.job_id }}' ]; then args+=(--job-id '${{ steps.cfg.outputs.job_id }}'); fi
+          if [ -n '${{ steps.cfg.outputs.source }}' ]; then args+=(--source '${{ steps.cfg.outputs.source }}'); fi
+          python scripts_leviathan/nexus_batch_worker.py "${args[@]}"
+
+      - name: Publish NEXUS result artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-result-${{ github.run_id }}
+          path: .nexus-artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Job summary
+        if: always()
+        shell: bash
+        run: |
+          echo '## NEXUS Omni Swarm Batch' >> "$GITHUB_STEP_SUMMARY"
+          echo "- mode: ${{ steps.cfg.outputs.mode }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- job_id: ${{ steps.cfg.outputs.job_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- run_id: ${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '- worker: github-actions' >> "$GITHUB_STEP_SUMMARY"
