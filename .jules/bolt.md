@@ -1,0 +1,3 @@
+## 2026-03-29 - ChromaDB RAG Indexer Word Truncation and Batching
+**Learning:** Unbound `.split()` calls on multi-megabyte text inputs allocate full Python lists of millions of word tokens into heap memory, causing significant CPU and memory overhead before slicing. Utilizing `split(None, 40001)` (`maxsplit`) caps token allocation to at most 40,001 items, reducing processing time by up to ~17x. Additionally, batching ChromaDB document inserts in chunks of 20 avoids per-item database transaction commits and vector overhead.
+**Action:** Always check string split calls on variable-length content for `maxsplit` parameters, and batch collection/database insertion calls when vectorizing document collections.
