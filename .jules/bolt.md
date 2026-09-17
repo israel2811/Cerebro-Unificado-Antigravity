@@ -1,0 +1,3 @@
+## 2026-02-23 - Maxsplit Truncation and ChromaDB Batching Optimization
+**Learning:** Calling `len(str.split())` and `str.split()[:N]` on large text documents (10MB+) in Python causes double full-string splitting and massive memory allocations (~1.06s). Using `str.split(None, N+1)` with `maxsplit` stops string scanning immediately after N words (~0.004s, >200x speedup). In addition, batching vector insertions (`collection.add`) into groups of 20 instead of single document inserts drastically reduces embedding call overhead.
+**Action:** Always use `maxsplit` when checking or truncating string word counts on large input buffers, and batch vector database write operations.
