@@ -23,8 +23,23 @@ def clean_html_noise(raw_text):
     text = soup.get_text(separator="\n")
     
     # Limpieza básica de caracteres nulos, múltiples saltos de línea y ruido de JSON/código.
-    print("[*] Aplicando expresiones regulares para limpieza profunda...")
-    text = re.sub(r'\{.*?\}', '', text, flags=re.DOTALL) # Quitar brackets JSON grandes
+    print("[*] Aplicando escaneo lineal para remoción de llaves JSON (evita backtracking de regex)...")
+    # Bolt Optimization: Replace re.sub(r'\{.*?\}', ...) with single-pass scan via string.find() to avoid catastrophic backtracking.
+    result = []
+    start = 0
+    while True:
+        open_brace = text.find('{', start)
+        if open_brace == -1:
+            result.append(text[start:])
+            break
+        result.append(text[start:open_brace])
+        close_brace = text.find('}', open_brace)
+        if close_brace == -1:
+            result.append(text[open_brace:])
+            break
+        start = close_brace + 1
+    text = "".join(result)
+
     text = re.sub(r'\n+', '\n', text)
     return text
 
