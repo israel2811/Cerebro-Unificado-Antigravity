@@ -41,6 +41,9 @@ def scan_and_extract():
                         
                         try:
                             # LECTURA POR BLOQUES (Armadura Anti-Colapso de RAM)
+                            # Bolt Optimization: Avoid redundant len(chunk.encode('utf-8')) call on every chunk.
+                            # Get file size directly via os.path.getsize to track total bytes accurately.
+                            file_size = os.path.getsize(filepath)
                             with open(filepath, "r", encoding="utf-8", errors="ignore") as infile:
                                 file_header_written = False
                                 
@@ -54,7 +57,8 @@ def scan_and_extract():
                                         file_header_written = True
                                         
                                     outfile.write(chunk)
-                                    total_bytes_extracted += len(chunk.encode('utf-8'))
+
+                            total_bytes_extracted += file_size
                                     
                             # Liberación de memoria tras cada archivo procesado (Sólo en local Windows - 2GB RAM)
                             if not IS_CLOUD_VM:
