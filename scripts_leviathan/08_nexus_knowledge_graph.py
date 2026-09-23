@@ -10,9 +10,8 @@
 import os
 try:
     import networkx as nx
-    import matplotlib.pyplot as plt
 except ImportError:
-    print("[!] Faltan librerías. Corriendo pip install networkx matplotlib...")
+    print("[!] Faltan librerías. Corriendo pip install networkx...")
     exit(1)
 
 GRAPH_FILE_PATH = r"C:\Users\Lenovo\Antigravity_Cloud_Project\nexus_vector_db\tesis_knowledge_graph.graphml" if os.name == 'nt' else "/workspaces/Antigravity_Cloud_Project/nexus_vector_db/tesis_knowledge_graph.graphml"
@@ -44,8 +43,8 @@ def build_omni_knowledge_graph():
     
     print(f"[*] Inyectando {len(triplas_fundacionales)} Triplas Cognitivas Fundacionales...")
     
-    for sujeto, predicado, objeto in triplas_fundacionales:
-        G.add_edge(sujeto, objeto, relation=predicado)
+    # Bulk edge insertion using NetworkX tuple generator for higher performance
+    G.add_edges_from((sujeto, objeto, {"relation": predicado}) for sujeto, predicado, objeto in triplas_fundacionales)
         
     # Guardar para compatibilidad universal (Se puede abrir en software Gephi)
     os.makedirs(os.path.dirname(GRAPH_FILE_PATH), exist_ok=True)
