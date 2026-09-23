@@ -1,0 +1,3 @@
+## 2026-06-15 - [Python Word-Count Truncation in RAG Indexer]
+**Learning:** Using `len(text.split()) > N` followed by `text.split()[:N]` is highly inefficient for large text inputs. This pattern performs two full string splits, creating massive list overhead in memory and redundant parsing. By replacing it with `text.split(None, N + 1)` (utilizing `maxsplit`), the split operation stops immediately after the required threshold is reached, bypassing the rest of the string entirely.
+**Action:** For string split limits or pagination checks, always specify the `maxsplit` parameter in `split()` to prevent unnecessary memory allocations and CPU overhead on large payloads.
