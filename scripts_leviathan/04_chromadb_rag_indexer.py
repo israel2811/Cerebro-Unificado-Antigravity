@@ -17,8 +17,12 @@ except ImportError:
     print("Corre: pip install chromadb sentence-transformers")
     exit(1)
 
-CLEAN_CHUNKS_DIR = r"/workspaces/Antigravity_Cloud_Project/scripts_leviathan/clean_chunks" if os.name == 'posix' else r"C:\Users\Lenovo\Antigravity_Cloud_Project\scripts_leviathan\clean_chunks"
-DB_PATH = r"/workspaces/Antigravity_Cloud_Project/nexus_vector_db" if os.name == 'posix' else r"C:\Users\Lenovo\Antigravity_Cloud_Project\nexus_vector_db"
+# Resolucion dinamica de rutas relativas al script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CLEAN_CHUNKS_DIR = os.path.join(BASE_DIR, "clean_chunks")
+DB_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "nexus_vector_db"))
+
+BATCH_SIZE = 20  # Insercion por lotes para acelerar inserciones hasta 20x en ChromaDB
 
 def local_chroma_rag_inject():
     print("🚀 [CHROMADB RAG] Base Vectorial 100% Autónoma y Gratuita Iniciada...")
@@ -36,36 +40,68 @@ def local_chroma_rag_inject():
         print(f"[!] Directorio {CLEAN_CHUNKS_DIR} vacío. Corre el 02_docs_prep_injector primero.")
         return
 
-    archivos = [f for f in os.listdir(CLEAN_CHUNKS_DIR) if f.endswith(".txt")]
+    # Ordenamiento alfabetico determinista
+    archivos = sorted([f for f in os.listdir(CLEAN_CHUNKS_DIR) if f.endswith(".txt")])
     
     if not archivos:
         print("[!] No hay chunks de texto para procesar.")
         return
 
-    print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales...")
+    print(f"[*] Transformando {len(archivos)} chunks de texto en Embeddings Vectoriales (Lote: {BATCH_SIZE})...")
     
+    batch_docs = []
+    batch_metas = []
+    batch_ids = []
+
     for i, archivo in enumerate(archivos, 1):
         ruta = os.path.join(CLEAN_CHUNKS_DIR, archivo)
         
         with open(ruta, "r", encoding="utf-8") as f:
             contenido = f.read()
             
-        # Segmentación preventiva (Chroma tiene límite por lote)
-        if len(contenido.split()) > 40000:
+        # Segmentacion preventiva eficiente usando maxsplit para evitar full split repetido en memoria
+        words = contenido.split(None, 40000)
+        if len(words) > 40000:
             print(f"  [!] Advertencia: {archivo} es enorme. Cortando por limite interno de Chroma.")
-            contenido = " ".join(contenido.split()[:40000])
+            contenido = " ".join(words[:40000])
 
         doc_id = f"chunk_{i}_{archivo}"
         
+        batch_docs.append(contenido)
+        batch_metas.append({"source": archivo, "type": "nexus_chunk"})
+        batch_ids.append(doc_id)
+
+        # Insercion vectorizada por lote
+        if len(batch_docs) >= BATCH_SIZE:
+            try:
+                print(f"  -> [{i}/{len(archivos)}] Incrustando lote de {len(batch_docs)} documentos...")
+                collection.add(
+                    documents=list(batch_docs),
+                    metadatas=list(batch_metas),
+                    ids=list(batch_ids)
+                )
+            except Exception as e:
+                print(f"  [X] Error vectorizando lote: {e}")
+            finally:
+                batch_docs.clear()
+                batch_metas.clear()
+                batch_ids.clear()
+
+    # Procesar cualquier resto final del lote
+    if batch_docs:
         try:
-            print(f"  -> [{i}/{len(archivos)}] Incrustando: {archivo}...")
+            print(f"  -> Incrustando lote final de {len(batch_docs)} documentos...")
             collection.add(
-                documents=[contenido],
-                metadatas=[{"source": archivo, "type": "nexus_chunk"}],
-                ids=[doc_id]
+                documents=list(batch_docs),
+                metadatas=list(batch_metas),
+                ids=list(batch_ids)
             )
         except Exception as e:
-            print(f"  [X] Error vectorizando {archivo}: {e}")
+            print(f"  [X] Error vectorizando lote final: {e}")
+        finally:
+            batch_docs.clear()
+            batch_metas.clear()
+            batch_ids.clear()
 
     print("\n✅ [CHROMADB RAG] Inyección Completada.")
     print(f"📂 Los archivos matriciales se guardaron en: {DB_PATH}")
