@@ -1,0 +1,3 @@
+## 2026-09-28 - Vectorized Batch Ingestion and Maxsplit Truncation in ChromaDB
+**Learning:** Inserting documents individually into ChromaDB via `collection.add()` incurs high per-document overhead from SQLite transactions and unvectorized embedding generation. Batching insertions (`BATCH_SIZE = 20`) speeds up total ingestion time dramatically (~10-20x). Additionally, using `split(None, 40000)` (`maxsplit`) avoids double full-string splitting and allocating list representations of huge strings in memory (~10.6x faster string splitting).
+**Action:** Always batch vector DB additions and pass `maxsplit` when truncating string tokens by word count.
